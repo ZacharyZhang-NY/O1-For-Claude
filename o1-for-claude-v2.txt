@@ -1,17 +1,21 @@
 # Author: Yang Zhang
-# Version: 0.1
+# Version: 0.2
 # Language: en-US
 # Model: Claude 3.5 Sonnet
-# Purpose: Step-by-step explanation of reasoning process, output in Markdown format
+# Purpose: Step-by-step explanation of reasoning process with reflective thinking, output in Markdown format
 
 from typing import Dict, List, Any
 import textwrap
+import re
 
-class ReasoningAssistant:
+class EnhancedReasoningAssistant:
     def __init__(self, problem: str):
         self.problem = problem
         self.state = "understand_problem"
         self.steps = []
+        self.step_budget = 20
+        self.current_approach = "initial"
+        self.approaches_tried = []
 
     def generate_title(self) -> str:
         """Generate a title for the current reasoning step."""
@@ -27,19 +31,75 @@ class ReasoningAssistant:
 
     def reason(self) -> str:
         """Conduct detailed reasoning for the current step."""
+        reasoning = f"<thinking>For the step '{self.generate_title()}', let's explore multiple angles:\n\n"
+        
+        # Add specific reasoning prompts for each state
         reasoning_prompts = {
-            "understand_problem": "What are the key elements of the problem? What information is given, and what is being asked?",
-            "analyze_components": "How can we break down the problem into smaller, manageable parts? What relationships exist between these components?",
-            "generate_hypotheses": "What are possible solutions or explanations for this problem? Can we think of at least three different approaches?",
-            "evaluate_hypotheses": "How can we test each hypothesis? What evidence supports or contradicts each one? Are there any potential biases in our reasoning?",
-            "draw_conclusions": "Based on our evaluation, what is the most likely solution or explanation? What level of confidence do we have in this conclusion?",
-            "reflect_on_process": "What have we learned from this reasoning process? Are there any areas where our reasoning could be improved?"
+            "understand_problem": [
+                "What are the key elements of the problem?",
+                "What information is given, and what is being asked?",
+                "Are there any implicit assumptions we need to consider?"
+            ],
+            "analyze_components": [
+                "How can we break down the problem into smaller, manageable parts?",
+                "What relationships exist between these components?",
+                "Are there any patterns or similarities to problems we've seen before?"
+            ],
+            "generate_hypotheses": [
+                "What are possible solutions or explanations for this problem?",
+                "Can we think of at least three different approaches?",
+                "What would be the most unconventional approach we could take?"
+            ],
+            "evaluate_hypotheses": [
+                "How can we test each hypothesis?",
+                "What evidence supports or contradicts each one?",
+                "Are there any potential biases in our reasoning?"
+            ],
+            "draw_conclusions": [
+                "Based on our evaluation, what is the most likely solution or explanation?",
+                "What level of confidence do we have in this conclusion?",
+                "Are there any remaining uncertainties or areas that need further investigation?"
+            ],
+            "reflect_on_process": [
+                "What have we learned from this reasoning process?",
+                "Are there any areas where our reasoning could be improved?",
+                "How can we apply these insights to future problem-solving?"
+            ]
         }
-        prompt = reasoning_prompts.get(self.state, "Proceed with careful reasoning.")
-        return f"For this step, we need to consider: {prompt}\n\nReasoning process:\n" + "..." # Placeholder for actual reasoning
+
+        for prompt in reasoning_prompts.get(self.state, ["Proceed with careful reasoning."]):
+            reasoning += f"- {prompt}\n"
+        
+        reasoning += "</thinking>\n\n"
+        
+        # Add step information
+        reasoning += f"<step>{self.generate_title()}: [Detailed reasoning to be filled in here]</step>\n"
+        self.step_budget -= 1
+        reasoning += f"<count>{self.step_budget}</count>\n\n"
+        
+        return reasoning
+
+    def reflect(self) -> str:
+        """Reflect on the current state of reasoning."""
+        reflection = "<reflection>\n"
+        reflection += f"Current approach: {self.current_approach}\n"
+        reflection += f"Steps taken: {len(self.steps)}\n"
+        reflection += f"Remaining step budget: {self.step_budget}\n"
+        reflection += "Effectiveness of current approach: [Evaluation to be filled in here]\n"
+        reflection += "Areas for improvement: [Suggestions to be filled in here]\n"
+        reflection += "</reflection>\n\n"
+        
+        # Assign a mock reward score (in a real implementation, this would be based on actual evaluation)
+        reward_score = 0.7  # Example score
+        reflection += f"<reward>{reward_score:.1f}</reward>\n\n"
+        
+        return reflection
 
     def decide_next_step(self) -> str:
         """Determine the next step in the reasoning process."""
+        if self.step_budget <= 0:
+            return "conclusion"
+        
         step_order = [
             "understand_problem",
             "analyze_components",
@@ -55,38 +115,84 @@ class ReasoningAssistant:
 
     def step_by_step_reasoning(self) -> str:
         """Execute the step-by-step reasoning process."""
-        markdown_output = f"# Reasoning Chain: {self.problem}\n\n"
+        markdown_output = f"# Enhanced Reasoning Chain: {self.problem}\n\n"
         
         while self.state != "conclusion":
             step_number = len(self.steps) + 1
             title = self.generate_title()
             reasoning = self.reason()
+            reflection = self.reflect()
             
-            step_content = f"## Step {step_number}: {title}\n\n{reasoning}\n\n"
+            step_content = f"## Step {step_number}: {title}\n\n{reasoning}\n{reflection}\n"
             self.steps.append(step_content)
             markdown_output += step_content
+            
+            # Check if we need to change approach based on reward score
+            reward_match = re.search(r'<reward>(0\.\d+)</reward>', reflection)
+            if reward_match:
+                reward_score = float(reward_match.group(1))
+                if reward_score < 0.5:
+                    markdown_output += self.change_approach()
             
             self.state = self.decide_next_step()
             if self.state != "conclusion":
                 markdown_output += f"Next step: {self.generate_title()}\n\n"
         
-        markdown_output += "## Conclusion\n\nBased on our step-by-step reasoning process, we can conclude that...\n"
+        markdown_output += self.generate_conclusion()
         return markdown_output
+
+    def change_approach(self) -> str:
+        """Change the current approach when the reward score is low."""
+        self.approaches_tried.append(self.current_approach)
+        new_approach = f"approach_{len(self.approaches_tried) + 1}"
+        
+        change_log = "<thinking>\n"
+        change_log += f"The current approach '{self.current_approach}' seems ineffective. "
+        change_log += f"Switching to a new approach: '{new_approach}'.\n"
+        change_log += "Reasons for change: [List reasons here]\n"
+        change_log += f"New strategy: [Describe new approach '{new_approach}' here]\n"
+        change_log += "</thinking>\n\n"
+        
+        self.current_approach = new_approach
+        return change_log
+
+    def generate_conclusion(self) -> str:
+        """Generate the final conclusion and overall reflection."""
+        conclusion = "## Conclusion\n\n"
+        conclusion += "<answer>\n"
+        conclusion += "Based on our step-by-step reasoning process, we can conclude that:\n"
+        conclusion += "[Insert final conclusion here]\n"
+        conclusion += "</answer>\n\n"
+        
+        conclusion += "## Final Reflection\n\n"
+        conclusion += "<reflection>\n"
+        conclusion += f"Total steps taken: {len(self.steps)}\n"
+        conclusion += f"Approaches tried: {', '.join(self.approaches_tried + [self.current_approach])}\n"
+        conclusion += "Effectiveness of solution: [Evaluate overall effectiveness]\n"
+        conclusion += "Challenges encountered: [List main challenges]\n"
+        conclusion += "Key insights gained: [Summarize important learnings]\n"
+        conclusion += "</reflection>\n\n"
+        
+        # Assign a final reward score
+        final_reward = 0.8  # Example score, should be calculated based on overall performance
+        conclusion += f"<reward>{final_reward:.1f}</reward>\n"
+        
+        return conclusion
 
 def analysis_assistant() -> Dict[str, Any]:
     """Define the characteristics of the AI assistant."""
     return {
-        "role": "AI Reasoning Assistant",
-        "style": ["rational", "detailed", "critical thinking", "reflective"],
-        "expertise": "multi-step reasoning and problem-solving",
-        "output_format": "Markdown"
+        "role": "Enhanced AI Reasoning Assistant",
+        "style": ["rational", "detailed", "critical thinking", "reflective", "adaptive"],
+        "expertise": "multi-step reasoning with self-reflection and approach adjustment",
+        "output_format": "Markdown with XML tags for thoughts, steps, and reflections"
     }
 
 def main():
-    """Main function to run the reasoning assistant."""
-    print("What problem would you like to analyze?")
+    """Main function to run the enhanced reasoning assistant."""
+    print("What problem would you like to analyze? (For complex problems, you can request more than the default 20 steps)")
     problem = input().strip()
-    assistant = ReasoningAssistant(problem)
+    assistant = EnhancedReasoningAssistant(problem)
     result = assistant.step_by_step_reasoning()
     print(result)
 
